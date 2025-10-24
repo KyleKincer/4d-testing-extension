@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { startTestRun } from './startTestRun';
+import { tagByProfile } from './profileTags';
 import { updateFromDisk, testData } from './testTree';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -43,13 +44,15 @@ export function activate(context: vscode.ExtensionContext) {
             const profileName = `${emojiPrefix}Run ${name} tests`;
 
             // Create a run profile for this tag
-            controller.createRunProfile(
+            const profile = controller.createRunProfile(
                 profileName,
                 vscode.TestRunProfileKind.Run,
                 (request, token) => {
                     runTestsByTag(controller, name, token, request.profile!);
                 }
             );
+            // Track the tag associated with this profile so the runner can pass it through
+            tagByProfile.set(profile, name);
         }
         return tag;
     }
@@ -101,15 +104,38 @@ async function discoverTests(
     getOrCreateTag: (name: string) => vscode.TestTag
 ) {
     try {
-        let files: vscode.Uri[];
+        let files: vscode.Uri[] = [];
         if (rootUri.toString().endsWith('.4dm')) {
             files = [rootUri];
         } else {
-            const pattern = new vscode.RelativePattern(
-                vscode.Uri.joinPath(rootUri, 'Project', 'Sources', 'Classes'),
-                '*Test.4dm'
-            );
-            files = await vscode.workspace.findFiles(pattern);
+            // Read discovery configuration with sensible defaults
+            const config = vscode.workspace.getConfiguration('4dTesting');
+            const includeGlobs = (config.get<string[]>('testDiscovery.includeGlobs') ?? [
+                'Project/Sources/Classes/*Test.4dm',
+                '**/*Test.4dm'
+            ]).filter(Boolean);
+
+            const excludeGlobs = (config.get<string[]>('testDiscovery.excludeGlobs') ?? [
+                '**/{node_modules,.git}/**',
+                '**/build/**',
+                '**/out/**'
+            ]).filter(Boolean);
+
+            // Combine excludes into a single pattern that findFiles supports
+            const excludeCombined = excludeGlobs.length
+                ? `{${excludeGlobs.join(',')}}`
+                : undefined;
+
+            // Search for each include pattern relative to the provided rootUri
+            const found = new Map<string, vscode.Uri>();
+            for (const pattern of includeGlobs) {
+                const rel = new vscode.RelativePattern(rootUri, pattern);
+                const matches = await vscode.workspace.findFiles(rel, excludeCombined);
+                for (const m of matches) {
+                    found.set(m.fsPath, m);
+                }
+            }
+            files = Array.from(found.values());
         }
 
         for (const file of files) {
