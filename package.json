@@ -16,6 +16,34 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "4D Testing Extension",
+      "properties": {
+        "4dTesting.testDiscovery.includeGlobs": {
+          "type": "array",
+          "markdownDescription": "Glob patterns to include when discovering `*Test.4dm` files. Paths are relative to each workspace folder.",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "Project/Sources/Classes/*Test.4dm",
+            "**/*Test.4dm"
+          ]
+        },
+        "4dTesting.testDiscovery.excludeGlobs": {
+          "type": "array",
+          "markdownDescription": "Glob patterns to exclude from discovery.",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/{node_modules,.git}/**",
+            "**/build/**",
+            "**/out/**"
+          ]
+        }
+      }
+    },
     "commands": [
       {
         "command": "4d-testing-extension.runTests",

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import { mapFunctionLineToSourceLine } from './parser';
+import { tagByProfile } from './profileTags';
 
 export async function startTestRun(
     controller: vscode.TestController,
@@ -58,8 +59,8 @@ export async function startTestRun(
 
         const cmdArgs = ['test', 'format=json'];
 
-        // If profile has tag, include tag param
-        const profileTag = (request.profile?.label?.match(/Run '(.+)' tests/) || [])[1];
+        // If profile is associated with a tag, include tag param
+        const profileTag = request.profile ? tagByProfile.get(request.profile) : undefined;
         if (profileTag) {
             cmdArgs.push(`tag=${profileTag}`);
         } else {
